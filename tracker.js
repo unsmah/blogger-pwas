@@ -1,20 +1,7 @@
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-
-<script>
 (function() {
-    // Inject the HTML and Styles into the page
-    const trackerHtml = `
-        <div style="padding: 20px; border: 1px solid #ddd; background: #f9f9f9; max-width: 400px; margin: 20px auto;">
-            <p>Visitor Tracking is active. Session ID: <strong id="visitor-id-display">Loading...</strong></p>
-            <p id="status-message" style="color: blue;">Gathering full visitor data...</p>
-            <p style="font-size: 0.8em; color: #666;">User Name: <strong id="user-name-display">Loading...</strong></p>
-            <p style="font-size: 0.8em; color: #666;">Current Title: <strong id="page-title-display"></strong></p>
-        </div>
-    `;
-    // Insert the HTML box at the beginning of the body
-    document.body.insertAdjacentHTML('afterbegin', trackerHtml);
+    // ----------------------------------------------------
+    // REMOVED: The visible HTML box injection is removed.
+    // ----------------------------------------------------
 
     // 1. Your Firebase Configuration (Keep this section exactly the same)
     const firebaseConfig = {
@@ -57,16 +44,21 @@
     // --- END NEW LOGIC ---
     
     let sessionStartTime = Date.now();
-    const idDisplay = document.getElementById('visitor-id-display');
-    const statusMessage = document.getElementById('status-message');
-    const userNameDisplay = document.getElementById('user-name-display');
-    const pageTitleDisplay = document.getElementById('page-title-display');
+    
+    // ----------------------------------------------------
+    // MODIFIED: Removed DOM element references
+    // ----------------------------------------------------
+    // const idDisplay = document.getElementById('visitor-id-display');
+    // const statusMessage = document.getElementById('status-message');
+    // const userNameDisplay = document.getElementById('user-name-display');
+    // const pageTitleDisplay = document.getElementById('page-title-display');
+    
     let lastObservedName = '';
     let initialSessionWriteDone = false; 
     let lastReportedTitle = document.title;
-    let updatePresenceRef; // Reference to updatePresence function will be defined later
+    let updatePresenceRef; 
     
-    // --- UTILITIES AND STATUS FUNCTIONS ---
+    // --- UTILITIES AND STATUS FUNCTIONS (No Change) ---
     
     async function getBatteryStatus() {
         if (!navigator.getBattery) return { batteryLevel: 'N/A', isCharging: 'N/A' };
@@ -153,7 +145,7 @@
                 let message = 'Permission Denied';
                 if (err.code === err.POSITION_UNAVAILABLE) message = 'Position Unavailable';
                 else if (err.code === err.TIMEOUT) message = 'Timeout';
-                if (statusMessage) statusMessage.textContent = `Location Status: ${message}. Tracking without coordinates.`;
+                console.log(`[Tracker] Location Status: ${message}. Tracking without coordinates.`);
                 resolve({ latitude: message, longitude: message, locationAccuracy: 'N/A' });
             }
             navigator.geolocation.getCurrentPosition(success, error, {
@@ -247,8 +239,7 @@
     async function initializeTracker() {
         if (!visitorId) return;
         
-        idDisplay.textContent = visitorId.substring(0, 12) + '...';
-        pageTitleDisplay.textContent = document.title;
+        console.log(`[Tracker] Initialized. Visitor ID: ${visitorId.substring(0, 12)}... Session ID: ${sessionId}`);
 
         const profileRef = visitorProfilesRef.child(visitorId);
         profileRef.once('value').then(async (snapshot) => {
@@ -287,7 +278,7 @@
             
             lastObservedName = localStorageFullName;
             localStorage.setItem('User', visitorName);
-            userNameDisplay.textContent = visitorName;
+            console.log(`[Tracker] User Name Set: ${visitorName}`);
 
             const baseInfo = await getBaseVisitorInfo();
             const profileUpdate = {
@@ -317,8 +308,9 @@
                 profileRef.update({ name: currentLocalStorageName })
                     .then(() => {
                         localStorage.setItem('User', currentLocalStorageName);
-                        userNameDisplay.textContent = currentLocalStorageName;
+                        // userNameDisplay.textContent = currentLocalStorageName; // Removed
                         lastObservedName = currentLocalStorageName;
+                        console.log(`[Tracker] Profile name updated successfully.`);
                     })
                     .catch(e => console.error("Error updating profile name:", e));
             }
@@ -346,9 +338,9 @@
             const currentName = localStorage.getItem('User') || `Visitor ${visitorId.substring(0, 4)}`;
             const currentTitle = document.title;
 
-            if (pageTitleDisplay.textContent !== currentTitle) {
-                pageTitleDisplay.textContent = currentTitle;
-            }
+            // if (pageTitleDisplay.textContent !== currentTitle) { // Removed
+            //     pageTitleDisplay.textContent = currentTitle;
+            // }
 
             const liveData = {
                 status: status,
@@ -365,11 +357,11 @@
             if (currentTitle !== lastReportedTitle || status === 'Online') { 
                 liveVisitorsRef.child(visitorId).set(liveData)
                     .then(() => {
-                        if (statusMessage) statusMessage.textContent = `${status}. Last update: ${new Date().toLocaleTimeString()}`;
+                        console.log(`[Tracker] Status: ${status}. Page: ${currentTitle}. Last update: ${new Date().toLocaleTimeString()}`);
                         lastReportedTitle = currentTitle;
                     })
                     .catch(e => {
-                        if (statusMessage) statusMessage.textContent = `Error: ${e.message}`;
+                        console.error(`[Tracker] Error updating live status: ${e.message}`);
                     });
             } else {
                  liveVisitorsRef.child(visitorId).update({
@@ -421,6 +413,7 @@
         userRefreshSignalRef.on('value', (snapshot) => {
             const signal = snapshot.val();
             if (signal && signal.signal === true) {
+                console.log("[Tracker] Received remote refresh signal. Reloading page...");
                 userRefreshSignalRef.remove().then(() => {
                     window.location.reload(true);
                 }).catch(() => {
@@ -430,7 +423,7 @@
         });
     }
 
-    // --- NEW REAL-TIME TITLE MONITORING ---
+    // --- REAL-TIME TITLE MONITORING ---
     function startTitleMonitor() {
         const titleElement = document.querySelector('title');
         if (!titleElement) {
@@ -448,9 +441,9 @@
                     if (updatePresenceRef) { 
                         updatePresenceRef(); 
                     } 
-                    if (pageTitleDisplay) {
-                        pageTitleDisplay.textContent = newTitle;
-                    }
+                    // if (pageTitleDisplay) { // Removed
+                    //     pageTitleDisplay.textContent = newTitle;
+                    // }
                 }
             }
         };
@@ -462,6 +455,5 @@
             childList: true 
         });
     }
-    // --- END NEW REAL-TIME TITLE MONITORING ---
+    // --- END REAL-TIME TITLE MONITORING ---
 })();
-</script>
